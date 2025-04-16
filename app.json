@@ -3,7 +3,7 @@
     "name": "cws-coffee-mobile-employee",
     "slug": "cws-coffee-mobile-employee",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
