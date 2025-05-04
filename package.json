@@ -9,13 +9,39 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@gorhom/bottom-sheet": "^5.1.1",
+    "@react-native-async-storage/async-storage": "^2.1.1",
+    "@react-native-community/datetimepicker": "8.2.0",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/drawer": "^7.3.9",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/stack": "^7.1.1",
+    "@stripe/stripe-react-native": "^0.43.0",
+    "@tanstack/react-query": "^5.66.9",
+    "@tanstack/react-query-devtools": "^5.66.9",
+    "axios": "^1.7.9",
+    "date-fns": "^4.1.0",
     "expo": "~52.0.46",
+    "expo-secure-store": "~14.0.1",
     "expo-status-bar": "~2.0.1",
     "react": "18.3.1",
-    "react-native": "0.76.9"
+    "react-native": "0.76.9",
+    "react-native-calendars": "^1.1309.0",
+    "react-native-config": "^1.5.5",
+    "react-native-dropdown-picker": "^5.4.6",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-modal-datetime-picker": "^18.0.0",
+    "react-native-otp-entry": "^1.8.3",
+    "react-native-paper": "^5.13.1",
+    "react-native-reanimated": "~3.16.1",
+    "react-native-safe-area-context": "^5.2.0",
+    "react-native-vector-icons": "^10.2.0",
+    "react-native-week-view": "^0.30.0",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "react-native-dotenv": "^3.4.11"
   },
   "private": true
 }
