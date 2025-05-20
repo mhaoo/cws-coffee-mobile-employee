@@ -1,167 +1,158 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
+  TextInput,
+  Platform,
+  Alert,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import BookingCard from "../../screens/order/bookingCard";
 import { useNavigation } from "@react-navigation/native";
-import { toCurrency } from "../../utils/currency";
+import useCancelBooking from "../../hooks/booking/useCancelBooking";
+import useBookingsByDate from "../../hooks/booking/useBookingsByDate";
+import useBookingsByEmail from "../../hooks/booking/useBookingsByEmail";
+import useBookingsByCurrentDateAndEmail from "../../hooks/booking/useBookingsByCurrentDateAndEmail";
 
-/* ------------ mock bookings ------------- */
-const seed = [
-  {
-    id: "bkg01",
-    code: "#100123",
-    date: "29/03/2025",
-    status: "PENDING",
-    customerEmail: "",
-    staffEmail: "staff@cafe.vn",
-    room: {
-      name: "Phòng VIP 1",
-      capacity: 10,
-      price: 50000,
-      time: "08:00 - 10:00",
-      paid: false,
-      img: "https://i.imgur.com/1z6hLwX.png",
-    },
-    products: [
-      {
-        id: "p1",
-        name: "Cà phê sữa",
-        price: 35000,
-        qty: 1,
-        img: "https://i.imgur.com/BbYI5Pt.png",
-      },
-    ],
-  },
-  {
-    id: "bkg02",
-    code: "#100124",
-    date: "29/03/2025",
-    status: "DOING",
-    customerEmail: "user@mail.com",
-    staffEmail: "staff@cafe.vn",
-    room: {
-      name: "Phòng Thường 2",
-      capacity: 6,
-      price: 40000,
-      time: "09:00 - 11:00",
-      paid: true,
-      img: "https://i.imgur.com/1z6hLwX.png",
-    },
-    products: [],
-  },
-  {
-    id: "bkg03",
-    code: "#099998",
-    date: "27/03/2025",
-    status: "DONE",
-    customerEmail: "",
-    staffEmail: "staff@cafe.vn",
-    room: {
-      name: "Phòng VIP 3",
-      capacity: 12,
-      price: 60000,
-      time: "14:00 - 16:00",
-      paid: true,
-      img: "https://i.imgur.com/1z6hLwX.png",
-    },
-    products: [
-      {
-        id: "p2",
-        name: "Bánh croissant",
-        price: 25000,
-        qty: 2,
-        img: "https://i.imgur.com/BbYI5Pt.png",
-      },
-    ],
-  },
-];
-
-/* ------------ badge màu theo trạng thái ------------- */
-const badgeColor = {
-  PENDING: "#f0ad4e",
-  DOING: "#0275d8",
-  DONE: "#999",
-};
-
-/* ------------ card component ------------- */
-const BookingCard = ({ order, onPress }) => {
-  const imgs = [order.room, ...order.products];
-  const total =
-    order.room.price + order.products.reduce((s, p) => s + p.price * p.qty, 0);
-
-  return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <View
-        style={[styles.badge, { backgroundColor: badgeColor[order.status] }]}
-      />
-
-      <View style={styles.cardHeader}>
-        <Text style={styles.title}>{order.room.name}</Text>
-        <Text style={styles.date}>{order.date}</Text>
-      </View>
-      <Text style={styles.code}>{order.code}</Text>
-      <Text style={styles.small}>
-        Khách: {order.customerEmail || "Khách lẻ"} | NV: {order.staffEmail}
-      </Text>
-
-      <FlatList
-        horizontal
-        data={imgs}
-        keyExtractor={(it, i) => it.id ?? `room${i}`}
-        renderItem={({ item }) => (
-          <View style={styles.thumbWrap}>
-            <Image source={{ uri: item.img }} style={styles.thumb} />
-          </View>
-        )}
-        showsHorizontalScrollIndicator={false}
-        style={{ marginVertical: 8 }}
-      />
-
-      <View style={styles.footer}>
-        <Text style={styles.total}>{toCurrency(total)} VNĐ</Text>
-        {order.status !== "DONE" && <Text style={styles.arrow}>›</Text>}
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-/* ------------ screen ------------ */
 export default function OrderScreen() {
+  // State
+  const [bookings, setBookings] = useState([]);
   const navigation = useNavigation();
-  const [bookings, setBookings] = useState(seed);
-  const [tab, setTab] = useState("PENDING"); // PENDING | DOING | DONE
+  const { mutate: cancelBooking } = useCancelBooking();
+  const [tab, setTab] = useState("PENDING"); // PENDING | PAID | DOING | CONFIRMED
+  const [date, setDate] = useState(new Date());
+  const [searchEmail, setSearchEmail] = useState("");
+  const [searchMode, setSearchMode] = useState("date"); // 'date' | 'email' | 'current'
+  const [showPicker, setShowPicker] = useState(false);
 
-  const filtered = bookings.filter((b) => b.status === tab);
+  // Format ngày DD/MM/YYYY
+  const strDate = useMemo(() => {
+    const d = date;
+    return (
+      `${String(d.getDate()).padStart(2, "0")}/` +
+      `${String(d.getMonth() + 1).padStart(2, "0")}/` +
+      d.getFullYear()
+    );
+  }, [date]);
 
-  const tabs = [
-    { key: "PENDING", label: "Chờ thanh toán" },
-    { key: "DOING", label: "Đang thực hiện" },
-    { key: "DONE", label: "Lịch sử" },
-  ];
+  // Format date param for API (YYYY-MM-DD)
+  const dateParam = useMemo(() => {
+    const d = date;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }, [date]);
 
-  const goDetail = (order) =>
-    navigation.navigate("OrderDetail", {
-      order,
-      updateStatus: (id, newStatus) =>
-        setBookings((bs) =>
-          bs.map((b) => (b.id === id ? { ...b, status: newStatus } : b))
-        ),
-    });
+  // APIs via hooks
+  const { data: dateBookings = [], refetch: refetchDateBookings } = useBookingsByDate(dateParam);
+  const { data: emailBookings = [], refetch: refetchEmailBookings } = useBookingsByEmail(searchEmail);
+  const { data: currentEmailBookings = [], refetch: refetchCurrentBookings } = useBookingsByCurrentDateAndEmail(searchEmail);
+
+  const handleSearchByEmail = () => setSearchMode("email");
+
+  const handleSearchCurrent = () => setSearchMode("current");
+
+  // Choose bookings based on mode
+  const bookingsToShow = useMemo(() => {
+    if (searchMode === "email") return emailBookings;
+    if (searchMode === "current") return currentEmailBookings;
+    return dateBookings;
+  }, [searchMode, dateBookings, emailBookings, currentEmailBookings]);
+
+  // Filter by tab status:
+  // PENDING, PAID straightforward;
+  // CONFIRMED tab (Đang thực hiện): status CONFIRMED and endTime >= now
+  // HISTORY tab: status CANCELED or EXPIRED, or status CONFIRMED and endTime < now
+  const filtered = useMemo(() => {
+    const now = new Date();
+    if (tab === "CONFIRMED") {
+      return bookingsToShow.filter((b) => {
+        if (b.status !== "CONFIRMED") return false;
+        const dt = new Date(`${b.bookingDate}T${b.endTime}`);
+        return dt >= now;
+      });
+    }
+    if (tab === "HISTORY") {
+      return bookingsToShow.filter((b) => {
+        if (b.status === "CANCELED" || b.status === "EXPIRED") return true;
+        if (b.status === "CONFIRMED") {
+          const dt = new Date(`${b.bookingDate}T${b.endTime}`);
+          return dt < now;
+        }
+        return false;
+      });
+    }
+    // PENDING or PAID
+    return bookingsToShow.filter((b) => b.status === tab);
+  }, [bookingsToShow, tab]);
+
+  const onChangeDate = (e, sel) => {
+    setShowPicker(Platform.OS === "ios");
+    if (sel) {
+      setSearchMode("date");
+      setDate(sel);
+    }
+  };
+
+  const updateBooking = (upd) => {
+    setBookings((bs) => bs.map((b) => (b.id === upd.id ? upd : b)));
+  };
 
   return (
     <View style={styles.container}>
-      {/* tab bar */}
+      {/* Date Picker */}
+      <TouchableOpacity
+        style={styles.dateBtn}
+        onPress={() => setShowPicker(true)}
+      >
+        <Text style={styles.dateTxt}>
+          {date.toLocaleDateString("vi-VN", {
+            weekday: "long",
+            day: "numeric",
+            month: "numeric",
+            year: "numeric",
+          })}
+        </Text>
+      </TouchableOpacity>
+      {showPicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          onChange={onChangeDate}
+        />
+      )}
+
+      {/* Email search */}
+      <TextInput
+        style={styles.emailInput}
+        placeholder="Nhập email khách hàng"
+        value={searchEmail}
+        onChangeText={setSearchEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <View style={styles.searchRow}>
+        <TouchableOpacity style={styles.searchBtn} onPress={handleSearchByEmail}>
+          <Text>Tìm kiếm</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.searchBtn} onPress={handleSearchCurrent}>
+          <Text>Tìm kiếm trong ngày</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab Bar */}
       <View style={styles.tabRow}>
-        {tabs.map((t) => (
+        {[
+          { key: "PENDING", label: "Chờ thanh toán" },
+          { key: "PAID", label: "Đã đặt trước" },
+          { key: "CONFIRMED", label: "Đang thực hiện" },
+          { key: "HISTORY", label: "Lịch sử" },
+        ].map((t) => (
           <TouchableOpacity
             key={t.key}
             style={[styles.tabBtn, tab === t.key && styles.tabActive]}
@@ -174,60 +165,164 @@ export default function OrderScreen() {
         ))}
       </View>
 
-      {/* list */}
+      {/* Booking List */}
       <FlatList
         data={filtered}
-        keyExtractor={(it) => it.id}
-        renderItem={({ item }) => (
-          <BookingCard order={item} onPress={() => goDetail(item)} />
-        )}
-        contentContainerStyle={{ padding: 20 }}
-        showsVerticalScrollIndicator={false}
+        keyExtractor={(b) => b.id}
+        renderItem={({ item }) => {
+          // extraActions tùy theo trạng thái booking
+          const extraActions = [];
+          if (item.status === "PENDING") {
+            extraActions.push({
+              title: "Thanh toán phòng",
+              onPress: () => updateBooking({ ...item, status: "PAID" }),
+            });
+            extraActions.push({
+              title: "Hủy đơn",
+              onPress: () => cancelBooking(item.id, {
+                onSuccess: (response) => {
+                  const msg = response.data?.message || 'Hủy đơn thành công';
+                  Alert.alert('Thông báo', msg);
+                  updateBooking({ ...item, status: 'CANCELED' });
+                  if (searchMode === 'date') refetchDateBookings();
+                  else if (searchMode === 'email') refetchEmailBookings();
+                  else if (searchMode === 'current') refetchCurrentBookings();
+                },
+                onError: (error) => {
+                  Alert.alert('Lỗi', error.message);
+                }
+              }),
+              style: { backgroundColor: "#d9534f" },
+              textStyle: { color: "#fff" },
+            });
+          } else if (item.status === "PAID") {
+            extraActions.push(
+              {
+                title: "Thêm SP",
+                onPress: () =>
+                  navigation.navigate("Menu", { booking: item, updateBooking }),
+              },
+              {
+                title: "Thêm Thiết bị",
+                onPress: () =>
+                  navigation.navigate("Device", { bookingId: item.id }),
+              },
+              {
+                title: `Thu tiền Order (${(item.orders || []).filter((o) => o.status === "PENDING").length})`,
+                onPress: () =>
+                  updateBooking({
+                    ...item,
+                    status: "DOING",
+                    orders: (item.orders || []).map((o) => ({ ...o, status: "PAID" })),
+                  }),
+              },
+              {
+                title: "Hủy đơn",
+                onPress: () => cancelBooking(item.id, {
+                  onSuccess: (response) => {
+                    const msg = response.data?.message || 'Hủy đơn thành công';
+                    Alert.alert('Thông báo', msg);
+                    updateBooking({ ...item, status: 'CANCELED' });
+                    if (searchMode === 'date') refetchDateBookings();
+                    else if (searchMode === 'email') refetchEmailBookings();
+                    else if (searchMode === 'current') refetchCurrentBookings();
+                  },
+                  onError: (error) => {
+                    Alert.alert('Lỗi', error.message);
+                  }
+                }),
+                style: { backgroundColor: "#d9534f" },
+                textStyle: { color: "#fff" },
+              }
+            );
+          } else if (item.status === "DOING") {
+            extraActions.push({
+              title: `Xác nhận Order (${(item.orders || []).filter((o) => o.status === "PAID").length})`,
+              onPress: () =>
+                updateBooking({
+                  ...item,
+                  status: "CONFIRMED",
+                  orders: (item.orders || []).map((o) => ({
+                    ...o,
+                    status: "CONFIRMED",
+                  })),
+                }),
+            });
+          } else if (item.status === "CONFIRMED") {
+            extraActions.push({
+              title: `Xác nhận Order (${(item.orders || []).filter((o) => o.status === "PAID").length})`,
+              onPress: () =>
+                updateBooking({
+                  ...item,
+                  status: "CONFIRMED",
+                  orders: (item.orders || []).map((o) => ({
+                    ...o,
+                    status: "CONFIRMED",
+                  })),
+                }),
+            });
+          }
+          return (
+            <BookingCard
+              order={item}
+              onPress={() =>
+                navigation.navigate("OrderDetail", {
+                  booking: item,
+                  updateBooking,
+                })
+              }
+              extraActions={extraActions}
+            />
+          );
+        }}
+        contentContainerStyle={{ padding: 16 }}
+        ListEmptyComponent={
+          <Text style={styles.emptyTxt}>Không có đơn nào</Text>
+        }
       />
     </View>
   );
 }
 
-/* ------------ styles ------------ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F7F7F7" },
-
-  tabRow: { flexDirection: "row", paddingHorizontal: 24, marginTop: 12 },
-  tabBtn: { marginRight: 28, paddingBottom: 6 },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: "#93540A" },
-  tabTxt: { fontSize: 16, color: "#666" },
-  tabTxtA: { color: "#93540A", fontWeight: "700" },
-
-  card: {
+  dateBtn: {
+    padding: 12,
     backgroundColor: "#fff",
-    borderRadius: 10,
-    marginBottom: 22,
-    padding: 14,
+    margin: 16,
+    borderRadius: 8,
     elevation: 2,
   },
-  badge: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: 10,
-    height: "100%",
-    borderTopLeftRadius: 10,
-    borderBottomLeftRadius: 10,
+  dateTxt: {
+    fontSize: 16,
+    color: "#333",
   },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between" },
-  title: { fontSize: 16, fontWeight: "600", color: "#333" },
-  date: { fontSize: 13, color: "#666" },
-  code: { fontSize: 13, color: "#999", marginTop: 2 },
-  small: { fontSize: 12, color: "#666", marginTop: 2 },
-
-  thumbWrap: { marginRight: 8 },
-  thumb: { width: 40, height: 40, borderRadius: 6 },
-
-  footer: {
+  tabRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
+    marginHorizontal: 16,
   },
-  total: { fontSize: 15, fontWeight: "700", color: "#333" },
-  arrow: { fontSize: 26, lineHeight: 26, color: "#ccc" },
+  tabBtn: { flex: 1, alignItems: "center", paddingVertical: 8 },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: "#93540A" },
+  tabTxt: { fontSize: 14, color: "#666" },
+  tabTxtA: { color: "#93540A", fontWeight: "700" },
+  emptyTxt: { textAlign: "center", marginTop: 40, color: "#999" },
+  emailInput: {
+    padding: 12,
+    backgroundColor: "#fff",
+    margin: 16,
+    borderRadius: 8,
+    elevation: 2,
+  },
+  searchRow: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+  },
+  searchBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#93540A",
+    borderRadius: 8,
+  },
 });

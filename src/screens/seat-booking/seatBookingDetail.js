@@ -7,14 +7,16 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  SafeAreaView,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
-import WeekView from "react-native-week-view";
-import GeneralButton from "../../../components/button/generalButton";
-import useAvailableSlots from "../../../hooks/useAvailableSlots";
-import useBookSeat from "../../../hooks/useBookSeat";
-import useBranchStore from "../../../store/branchStore";
+import { Calendar as BigCalendar } from "react-native-big-calendar";
+import GeneralButton from "../../components/button/generalButton";
+import useAvailableSlots from "../../hooks/booking/useAvailableSlots";
+import useBookSeat from "../../hooks/booking/useBookSeat";
+import useRoomDetailById from "../../hooks/room/useRoomDetailById";
+// import useBranchStore from "../../../store/branchStore";
 import * as SecureStore from "expo-secure-store";
 
 const { width } = Dimensions.get("window");
@@ -25,7 +27,9 @@ const CLOSING_HOUR = 22;
 
 export default SeatBookingDetail = function ({ route, navigation }) {
   const { roomId } = route.params;
-  const { branchId } = useBranchStore();
+  // Load room details for capacity and price
+  const { data: roomDetail } = useRoomDetailById(roomId);
+  // const { branchId } = useBranchStore();
 
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -44,6 +48,17 @@ export default SeatBookingDetail = function ({ route, navigation }) {
   console.log("📅 Date sent to API:", formattedDate, "roomId:", roomId);
 
   const bookSeatMutation = useBookSeat();
+
+  const events = (availableSlots?.availableSlots || []).map((slot) => {
+    const start = new Date(`${formattedDate}T${slot.startTime}`);
+    const end = new Date(`${formattedDate}T${slot.endTime}`);
+    return {
+      id: slot.id ?? Math.random().toString(),
+      title: slot.status === "Valid" ? "Khả dụng" : "Đã đặt",
+      start,
+      end,
+    };
+  });
 
   //* Làm tròn thời gian về bội số 30 phút
   const adjustToNearest30Minutes = (time, roundUp = false) => {
@@ -82,6 +97,7 @@ export default SeatBookingDetail = function ({ route, navigation }) {
 
     // Kiểm tra nếu thời gian bắt đầu không nằm trong khoảng 6:00 AM và 10:00 PM
     if (time.getHours() < OPENING_HOUR || time.getHours() >= CLOSING_HOUR) {
+      setPickerVisible(false);
       Alert.alert(
         "Lỗi",
         "Giờ bắt đầu phải nằm trong khung từ 06:00 đến 22:00."
@@ -101,6 +117,7 @@ export default SeatBookingDetail = function ({ route, navigation }) {
       setEndTime(null); // Reset endTime
     } else {
       if (!startTime) {
+        setPickerVisible(false);
         Alert.alert("Lỗi", "Vui lòng chọn giờ bắt đầu trước.");
         return;
       }
@@ -110,6 +127,7 @@ export default SeatBookingDetail = function ({ route, navigation }) {
       minEndTime.setMinutes(minEndTime.getMinutes() + MIN_DURATION); // Phải cách startTime ít nhất 30 phút
 
       if (adjustedStartTime < minEndTime) {
+        setPickerVisible(false);
         Alert.alert(
           "Lỗi",
           `Thời gian kết thúc phải cách thời gian bắt đầu ít nhất ${MIN_DURATION} phút.`
@@ -311,23 +329,36 @@ export default SeatBookingDetail = function ({ route, navigation }) {
     console.log("Gửi yêu cầu đặt chỗ với:", bookingData, accessToken);
 
     bookSeatMutation.mutate(
-      {
-        roomId: roomId,
-        bookingData,
-      },
+      { roomId, bookingData },
       {
         onSuccess: (response) => {
           console.log("API Response booking id:", response.data.id);
-          const bookingId = response.data.id;
-          navigation.navigate("Xác nhận đặt chỗ", { bookingId });
-          Alert.alert("Đặt chỗ thành công!");
+          // Hiện alert và sau khi đóng sẽ reset lựa chọn
+          Alert.alert(
+            "Đặt chỗ thành công!",
+            undefined,
+            [
+              {
+                text: "OK",
+                onPress: () => {
+                  // Reset state về ban đầu
+                  setStartTime(null);
+                  setEndTime(null);
+                  setShowCalendar(false);
+                  setIsSelectingStart(true);
+                  setPickerVisible(false);
+                  // Reset date về hôm nay
+                  setCurrentDate(new Date());
+                },
+              },
+            ],
+            { cancelable: false }
+          );
         },
         onError: (error) => {
           if (error.response?.data?.message) {
-            // Nếu API trả về thông báo về việc không thể đặt nhiều hơn 1 slot
             Alert.alert("Thông báo", error.response.data.message);
           } else {
-            // Nếu có lỗi khác
             Alert.alert(
               "Lỗi",
               "Không thể thực hiện yêu cầu. Vui lòng thử lại."
@@ -354,138 +385,165 @@ export default SeatBookingDetail = function ({ route, navigation }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Toggle Lịch */}
-      <TouchableOpacity style={styles.selectBox} onPress={toggleCalendar}>
-        <Text style={styles.selectText}>
-          {showCalendar ? "Ẩn lịch" : "Chọn ngày và giờ"}
-        </Text>
-        <Text style={styles.detailsText}>
-          {`Ngày: ${currentDate.toDateString()}`}
-        </Text>
-        <Text style={styles.detailsText}>
-          {`Giờ bắt đầu: ${
-            startTime
-              ? startTime.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                })
-              : "Chưa chọn"
-          }`}
-        </Text>
-        <Text style={styles.detailsText}>
-          {`Giờ kết thúc: ${
-            endTime
-              ? endTime.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                })
-              : "Chưa chọn"
-          }`}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Hiển thị Lịch khi bật */}
-      {showCalendar && (
-        <>
-          <Calendar
-            onDayPress={handleDateSelect}
-            markedDates={{
-              [currentDate.toISOString().split("T")[0]]: {
-                selected: true,
-                marked: true,
-                selectedColor: "blue",
-              },
-            }}
-            minDate={todayString}
-          />
-          <View style={styles.timePickerContainer}>
-            <TouchableOpacity
-              style={styles.timePickerButton}
-              onPress={() => {
-                setIsSelectingStart(true);
-                setPickerVisible(true);
-              }}
-            >
-              <Text style={styles.timePickerText}>Chọn giờ bắt đầu</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.timePickerButton}
-              onPress={() => {
-                setIsSelectingStart(false);
-                setPickerVisible(true);
-              }}
-              disabled={!startTime}
-            >
-              <Text style={styles.timePickerText}>Chọn giờ kết thúc</Text>
-            </TouchableOpacity>
-          </View>
-          <GeneralButton
-            text="Kiểm tra & Đặt chỗ"
-            onPress={checkAvailability}
-          />
-        </>
-      )}
-
-      {/* Hiển thị lịch các slot đã đặt trước */}
-      <View style={styles.weekViewContainer}>
-        <Text style={styles.subHeader}>Lịch đặt chỗ</Text>
-        <WeekView
-          events={
-            availableSlots?.availableSlots
-              ?.map((slot) => {
-                const startDate = new Date(
-                  `${formattedDate}T${slot.startTime}`
-                );
-                const endDate = new Date(`${formattedDate}T${slot.endTime}`);
-
-                return {
-                  id: slot.id || Math.random().toString(),
-                  description: slot.status === "Valid" ? "Khả dụng" : "Đã đặt",
-                  startDate,
-                  endDate,
-                  color: slot.status === "Valid" ? "#4CAF50" : "#D32F2F", // Xanh lá cây nếu còn trống, đỏ nếu đã đặt
-                };
-              })
-              .filter(Boolean) || []
-          }
-          selectedDate={currentDate}
-          numberOfDays={4}
-          hoursInDisplay={14}
-          timeStep={30}
-          formatDateHeader="ddd"
-          startHour={8}
-          endHour={22}
-          onEventPress={(event) =>
-            Alert.alert(
-              "Thông báo",
-              event.description === "Khả dụng"
-                ? "Khung giờ này còn trống."
-                : "Khung giờ này đã được đặt."
-            )
-          }
-        />
+    <SafeAreaView style={styles.screenContainer}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>‹ Quay lại</Text>
+        </TouchableOpacity>
       </View>
+      <ScrollView contentContainerStyle={styles.contentContainer}>
+        {/* Toggle Lịch */}
+        <TouchableOpacity style={styles.selectBox} onPress={toggleCalendar}>
+          <Text style={styles.selectText}>
+            {showCalendar ? "Ẩn lịch" : "Chọn ngày và giờ"}
+          </Text>
+          <Text style={styles.detailsText}>
+            {`Ngày: ${currentDate.toDateString()}`}
+          </Text>
+          <Text style={styles.detailsText}>
+            {`Giờ bắt đầu: ${
+              startTime
+                ? startTime.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  })
+                : "Chưa chọn"
+            }`}
+          </Text>
+          <Text style={styles.detailsText}>
+            {`Giờ kết thúc: ${
+              endTime
+                ? endTime.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  })
+                : "Chưa chọn"
+            }`}
+          </Text>
+        </TouchableOpacity>
 
-      <DateTimePickerModal
-        isVisible={isPickerVisible}
-        mode="time"
-        onConfirm={handleConfirmTime}
-        onCancel={() => setPickerVisible(false)}
-      />
+        {/* Hiển thị Lịch khi bật */}
+        {showCalendar && (
+          <>
+            <Calendar
+              onDayPress={handleDateSelect}
+              markedDates={{
+                [currentDate.toISOString().split("T")[0]]: {
+                  selected: true,
+                  marked: true,
+                  selectedColor: "blue",
+                },
+              }}
+              minDate={todayString}
+            />
+            <View style={styles.timePickerContainer}>
+              <TouchableOpacity
+                style={styles.timePickerButton}
+                onPress={() => {
+                  setIsSelectingStart(true);
+                  setPickerVisible(true);
+                }}
+              >
+                <Text style={styles.timePickerText}>Chọn giờ bắt đầu</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.timePickerButton}
+                onPress={() => {
+                  setIsSelectingStart(false);
+                  setPickerVisible(true);
+                }}
+                disabled={!startTime}
+              >
+                <Text style={styles.timePickerText}>Chọn giờ kết thúc</Text>
+              </TouchableOpacity>
+            </View>
+            <GeneralButton
+              text="Kiểm tra & Đặt chỗ"
+              onPress={checkAvailability}
+            />
+          </>
+        )}
 
-      {/* Thông tin chi tiết */}
+        {/* Hiển thị lịch các slot đã đặt trước */}
+        <View style={styles.weekViewContainer}>
+          <Text style={styles.subHeader}>Lịch đặt chỗ</Text>
+          {/* <WeekView
+            events={
+              availableSlots?.availableSlots
+                ?.map((slot) => {
+                  const startDate = new Date(
+                    `${formattedDate}T${slot.startTime}`
+                  );
+                  const endDate = new Date(`${formattedDate}T${slot.endTime}`);
+
+                  return {
+                    id: slot.id || Math.random().toString(),
+                    description: slot.status === "Valid" ? "Khả dụng" : "Đã đặt",
+                    startDate,
+                    endDate,
+                    color: slot.status === "Valid" ? "#4CAF50" : "#D32F2F", // Xanh lá cây nếu còn trống, đỏ nếu đã đặt
+                  };
+                })
+                .filter(Boolean) || []
+            }
+            selectedDate={currentDate}
+            numberOfDays={4}
+            hoursInDisplay={14}
+            timeStep={30}
+            formatDateHeader="ddd"
+            startHour={8}
+            endHour={22}
+            onEventPress={(event) =>
+              Alert.alert(
+                "Thông báo",
+                event.description === "Khả dụng"
+                  ? "Khung giờ này còn trống."
+                  : "Khung giờ này đã được đặt."
+              )
+            }
+          /> */}
+
+          <BigCalendar
+            events={events}
+            height={400}
+            date={currentDate}
+            mode="week"
+            swipeEnabled={false}
+            onPressEvent={(event) =>
+              Alert.alert(
+                "Thông báo",
+                event.title === "Khả dụng"
+                  ? "Khung giờ này còn trống."
+                  : "Khung giờ này đã được đặt."
+              )
+            }
+          />
+        </View>
+
+        <DateTimePickerModal
+          isVisible={isPickerVisible}
+          mode="time"
+          minuteInterval={15}
+          onConfirm={handleConfirmTime}
+          onCancel={() => setPickerVisible(false)}
+        />
+      </ScrollView>
+      {/* Footer */}
       <View style={styles.footerContainer}>
         <View style={styles.footerContent}>
           <View style={styles.footerInfo}>
             <Text style={styles.capacityText}>Số lượng tối đa:</Text>
-            <Text style={styles.capacityText}>10</Text>
+            <Text style={styles.capacityText}>{roomDetail?.capacity}</Text>
           </View>
           <View style={styles.footerInfo}>
             <Text style={styles.priceText}>Giá:</Text>
-            <Text style={styles.priceText}>55.000 đ/giờ</Text>
+            <Text style={styles.priceText}>{roomDetail?.price} đ/giờ</Text>
           </View>
         </View>
         <GeneralButton
@@ -497,20 +555,29 @@ export default SeatBookingDetail = function ({ route, navigation }) {
           Phí đặt chỗ ngồi sẽ được hoàn trả 100% nếu hủy đặt chỗ trước 24 giờ.
         </Text>
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
+  screenContainer: {
+    flex: 1,
     backgroundColor: "#F9F9F9",
   },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 180,
+  },
   selectBox: {
-    backgroundColor: "#EFEFEF",
+    backgroundColor: "#FFFFFF",
     padding: 16,
     borderRadius: 8,
     marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 2,
   },
   selectText: {
     fontSize: 18,
@@ -519,6 +586,7 @@ const styles = StyleSheet.create({
   detailsText: {
     fontSize: 16,
     marginTop: 8,
+    color: "#333333",
   },
   timePickerContainer: {
     flexDirection: "row",
@@ -526,12 +594,12 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   timePickerButton: {
-    backgroundColor: "#007BFF",
+    backgroundColor: "#93540A",
     padding: 12,
     borderRadius: 8,
   },
   timePickerText: {
-    color: "white",
+    color: "#FFFFFF",
     fontWeight: "bold",
   },
   confirmButton: {
@@ -551,10 +619,41 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 16,
   },
-  footerContainer: {
-    paddingHorizontal: 0,
-    marginHorizontal: -16,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEEEEE",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backButton: {
+    marginRight: 16,
+  },
+  backButtonText: {
+    color: "#93540A",
+    fontSize: 18,
+  },
+  footerContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderTopWidth: 1,
+    borderColor: "#EEEEEE",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   footerContent: {
     flexDirection: "row",
@@ -573,5 +672,18 @@ const styles = StyleSheet.create({
     color: "#A8A8A8",
     marginHorizontal: 20,
     marginBottom: 12,
+  },
+  capacityText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  priceText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  subHeader: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
   },
 });

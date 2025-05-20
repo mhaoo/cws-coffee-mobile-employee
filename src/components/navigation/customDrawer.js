@@ -13,6 +13,12 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 const logoImage = require("../../images/logo-no-background.png");
 
 const items = [
+  {
+    name: "Đơn hàng",
+    iconLib: Ionicons,
+    iconName: "receipt-outline",
+    badge: 2,
+  },
   { name: "Menu", iconLib: Ionicons, iconName: "cafe-outline" },
   {
     name: "Đặt chỗ",
@@ -20,12 +26,7 @@ const items = [
     iconName: "seat-outline",
   },
   { name: "Thiết bị", iconLib: Ionicons, iconName: "print-outline" },
-  {
-    name: "Đơn hàng",
-    iconLib: Ionicons,
-    iconName: "receipt-outline",
-    badge: 2,
-  },
+  { name: "Quản lý chỗ ngồi", iconLib: Ionicons, iconName: "print-outline" },
 ];
 
 export default function CustomDrawer(props) {
@@ -68,9 +69,6 @@ export default function CustomDrawer(props) {
             </TouchableOpacity>
           );
         })}
-
-        {/* Placeholder ô vuông trống */}
-        <TouchableOpacity style={styles.btn} />
       </ScrollView>
 
       {/* Logout */}

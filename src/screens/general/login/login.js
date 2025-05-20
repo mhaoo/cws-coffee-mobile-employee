@@ -81,18 +81,18 @@ export default Login = function ({ navigation }) {
     //   }
     // );
 
-    // try {
-    //   await signIn(inputEmail, inputPass); // login + fetch profile
-    //   Alert.alert("Đăng nhập thành công");
-    //   navigation.replace("MainApp"); // sang Drawer
-    // } catch (err) {
-    //   Alert.alert(
-    //     "Đăng nhập thất bại",
-    //     err.response?.data?.message || err.message || "Có lỗi xảy ra"
-    //   );
-    // }
+    try {
+      await signIn(inputEmail, inputPass); // login + fetch profile
+      Alert.alert("Đăng nhập thành công");
+      navigation.replace("MainApp"); // sang Drawer
+    } catch (err) {
+      Alert.alert(
+        "Đăng nhập thất bại",
+        err.response?.data?.message || err.message || "Có lỗi xảy ra"
+      );
+    }
 
-    navigation.replace("MainApp");
+    // navigation.replace("MainApp");
   };
 
   return (

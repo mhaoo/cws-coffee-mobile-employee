@@ -5,13 +5,14 @@ import Menu from "../../screens/menu/menu";
 import SeatBooking from "../../screens/seat-booking/seatBooking";
 import Device from "../../screens/device/device";
 import Order from "../../screens/order/order";
+import SeatsManagementScreen from "../../screens/seat-management/seatManagement";
 
 const Drawer = createDrawerNavigator();
 
 export default function AppDrawer() {
   return (
     <Drawer.Navigator
-      initialRouteName="Menu"
+      initialRouteName="Đơn hàng"
       drawerContent={(props) => <CustomDrawer {...props} />}
       screenOptions={{
         headerShown: false,
@@ -20,10 +21,14 @@ export default function AppDrawer() {
         sceneContainerStyle: { marginLeft: 180 },
       }}
     >
+      <Drawer.Screen name="Đơn hàng" component={Order} />
       <Drawer.Screen name="Menu" component={Menu} />
       <Drawer.Screen name="Đặt chỗ" component={SeatBooking} />
       <Drawer.Screen name="Thiết bị" component={Device} />
-      <Drawer.Screen name="Đơn hàng" component={Order} />
+      <Drawer.Screen
+        name="Quản lý chỗ ngồi"
+        component={SeatsManagementScreen}
+      />
     </Drawer.Navigator>
   );
 }
