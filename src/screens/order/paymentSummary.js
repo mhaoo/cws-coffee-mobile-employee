@@ -7,11 +7,21 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  TextInput,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { toCurrency } from "../../utils/currency";
+import usePayBooking from "../../hooks/payment/usePayBooking";
 
 export default function PaymentSummaryScreen({ route, navigation }) {
   const { booking, total, onSuccess } = route.params;
+
+  // State for cash payment form
+  const [showCashForm, setShowCashForm] = useState(false);
+  const [cash, setCash] = useState(total);
+  const [usedMemberPoint, setUsedMemberPoint] = useState(0);
+  const { mutate: payBooking, isLoading: isPaying } = usePayBooking();
 
   // Tổng hợp các mục cần thanh toán: phòng + orders + devices
   const items = [
@@ -20,12 +30,41 @@ export default function PaymentSummaryScreen({ route, navigation }) {
     ...(booking.devices || []),
   ];
 
-  const doPay = () => {
-    // Navigate to QR payment only
-      navigation.navigate("QrPayment", {
-        amount: total,
-        onSuccess: onSuccess,
-      });
+  // Handler for QR payment flow
+  const handleQRPayment = () => {
+    payBooking(
+      {
+        bookingId: booking.id,
+        paymentMethod: "CARD",
+        usedMemberPoint: 0,
+        cash: 0,
+      },
+      {
+        onSuccess: (response) => {
+          const qrBase64 = response.data?.qrCode;
+          navigation.navigate("QrPayment", { qrBase64, onSuccess });
+        },
+        onError: (error) => {
+          Alert.alert("Lỗi thanh toán", error.message);
+        },
+      }
+    );
+  };
+
+  // Handler for cash payment flow
+  const handleCashPayment = () => {
+    payBooking(
+      { bookingId: booking.id, paymentMethod: "CASH", usedMemberPoint, cash },
+      {
+        onSuccess: () => {
+          onSuccess();
+          navigation.goBack();
+        },
+        onError: (error) => {
+          Alert.alert("Lỗi thanh toán", error.message);
+        },
+      }
+    );
   };
 
   return (
@@ -44,9 +83,57 @@ export default function PaymentSummaryScreen({ route, navigation }) {
 
       <Text style={styles.total}>Tổng: {toCurrency(total)} VNĐ</Text>
 
-      <TouchableOpacity style={styles.payBtn} onPress={doPay}>
-        <Text style={styles.payTxt}>Thanh toán (Quét QR)</Text>
-      </TouchableOpacity>
+      {/* Payment method selection */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.payBtn, { flex: 1, marginRight: 8 }]}
+          onPress={handleQRPayment}
+          disabled={isPaying}
+        >
+          {isPaying ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.payTxt}>Thanh toán (Quét QR)</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.payBtn, { flex: 1 }]}
+          onPress={() => setShowCashForm(true)}
+        >
+          <Text style={styles.payTxt}>Thanh toán (Tiền mặt)</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Cash payment form */}
+      {showCashForm && (
+        <View style={styles.cashForm}>
+          <Text style={styles.inputLabel}>Tiền khách đưa (VNĐ):</Text>
+          <TextInput
+            value={String(cash)}
+            onChangeText={(t) => setCash(Number(t))}
+            keyboardType="numeric"
+            style={styles.textInput}
+          />
+          <Text style={styles.inputLabel}>Điểm sử dụng:</Text>
+          <TextInput
+            value={String(usedMemberPoint)}
+            onChangeText={(t) => setUsedMemberPoint(Number(t))}
+            keyboardType="numeric"
+            style={styles.textInput}
+          />
+          <TouchableOpacity
+            style={styles.payBtn}
+            onPress={handleCashPayment}
+            disabled={isPaying}
+          >
+            {isPaying ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.payTxt}>Xác nhận thanh toán</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -65,6 +152,16 @@ const styles = StyleSheet.create({
     marginVertical: 12,
     textAlign: "right",
   },
+  buttonRow: { flexDirection: "row", marginBottom: 12 },
   payBtn: { backgroundColor: "#93540A", padding: 14, borderRadius: 6 },
   payTxt: { color: "#fff", textAlign: "center", fontWeight: "700" },
+  cashForm: { marginTop: 12 },
+  inputLabel: { fontSize: 14, marginBottom: 4 },
+  textInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 12,
+  },
 });

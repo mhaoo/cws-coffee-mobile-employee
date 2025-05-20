@@ -86,10 +86,14 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   // Navigate to PaymentSummary instead of direct payment
   const handlePayBooking = () => {
-    // Prepare updated booking with current orders/devices
+    // Prepare updated booking for payment: use fetched items as order line items
+    const lineItems = items.map((i) => ({
+      ...i,
+      qty: i.quantity,
+    }));
     const updatedBooking = {
       ...booking,
-      orders: booking.orders || [],
+      orders: lineItems,
       devices: booking.devices || [],
     };
     // Update booking state before navigating
@@ -98,11 +102,11 @@ export default function OrderDetailScreen({ route, navigation }) {
       booking: updatedBooking,
       total: totalSum,
       onSuccess: () => {
-        // After payment success, update status to DOING
+        // After payment success, update status to CONFIRMED
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         updateBooking({
           ...updatedBooking,
-          status: "DOING",
+          status: "CONFIRMED",
           orders: updatedBooking.orders.map((o) => ({ ...o, status: "PAID" })),
           devices: updatedBooking.devices.map((d) => ({
             ...d,
@@ -156,7 +160,7 @@ export default function OrderDetailScreen({ route, navigation }) {
         <Text style={styles.itemTotal}>
           {toCurrency(item.price * item.quantity)} VNĐ
         </Text>
-        {booking.status === "DOING" && !isConfirmed && (
+        {booking.status === "CONFIRMED" && !isConfirmed && (
           <TouchableOpacity
             onPress={() => handleConfirmItem(item)}
             style={styles.confirmBtnWrapper}

@@ -9,6 +9,8 @@ const authApi = {
 
   getProfile: () => apiClient.get("/api/employee"),
 
+  getCustomerInformation: () => apiClient.get(`/api/customer`),
+
   getBranchesDetailById: (branchId) =>
     apiClient.get(`/api/employee/branches/${branchId}`),
 
@@ -113,8 +115,9 @@ const authApi = {
 
   //! PAYMENT
   //* API gửi yêu cầu thanh toán của đơn booking
-  payBooking: (bookingId) =>
-    apiClient.post(`/api/employee/bookings/payment/${bookingId}`),
+  // body should include { paymentMethod: 'CASH'|'CARD', usedMemberPoint: number, cash: number }
+  payBooking: (bookingId, body) =>
+    apiClient.post(`/api/employee/bookings/payment/${bookingId}`, body),
 
   //* API tạo payment intent
   createPaymentIntentBooking: (amount, bookingId) =>

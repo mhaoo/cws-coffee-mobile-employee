@@ -3,7 +3,7 @@ import authApi from "../../api/authApi";
 
 const usePayBooking = () => {
   return useMutation({
-    mutationFn: (bookingId) => authApi.payBooking(bookingId),
+    mutationFn: ({ bookingId, ...body }) => authApi.payBooking(bookingId, body),
   });
 };
 

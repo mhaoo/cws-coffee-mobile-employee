@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import BookingCard from "../../screens/order/bookingCard";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import useCancelBooking from "../../hooks/booking/useCancelBooking";
 import useBookingsByDate from "../../hooks/booking/useBookingsByDate";
 import useBookingsByEmail from "../../hooks/booking/useBookingsByEmail";
@@ -51,6 +51,19 @@ export default function OrderScreen() {
   const { data: dateBookings = [], refetch: refetchDateBookings } = useBookingsByDate(dateParam);
   const { data: emailBookings = [], refetch: refetchEmailBookings } = useBookingsByEmail(searchEmail);
   const { data: currentEmailBookings = [], refetch: refetchCurrentBookings } = useBookingsByCurrentDateAndEmail(searchEmail);
+
+  // Refetch bookings when screen is focused (e.g., after payment)
+  useFocusEffect(
+    useCallback(() => {
+      if (searchMode === 'date') {
+        refetchDateBookings();
+      } else if (searchMode === 'email') {
+        refetchEmailBookings();
+      } else if (searchMode === 'current') {
+        refetchCurrentBookings();
+      }
+    }, [searchMode, refetchDateBookings, refetchEmailBookings, refetchCurrentBookings])
+  );
 
   const handleSearchByEmail = () => setSearchMode("email");
 

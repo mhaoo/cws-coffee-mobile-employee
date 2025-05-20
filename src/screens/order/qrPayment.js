@@ -1,17 +1,22 @@
 // src/screens/payment/QrPayment.js
 
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
 export default function QrPaymentScreen({ route, navigation }) {
-  const { amount, onSuccess } = route.params;
+  const { qrBase64, amount, onSuccess } = route.params;
+  // If API returns a base64 QR image string, render it; otherwise generate QR code from amount
   const payload = JSON.stringify({ amount });
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Quét mã QR để thanh toán</Text>
-      <QRCode value={payload} size={200} />
+      {qrBase64 ? (
+        <Image source={{ uri: `${qrBase64}` }} style={styles.qrImage} />
+      ) : (
+        <QRCode value={payload} size={200} />
+      )}
       <Text style={styles.note}>Quét xong nhấn “Hoàn tất”</Text>
       <TouchableOpacity
         style={styles.doneBtn}
@@ -35,6 +40,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, marginBottom: 20 },
   note: { color: "#666", marginTop: 12 },
+  qrImage: { width: 200, height: 200 },
   doneBtn: {
     marginTop: 24,
     backgroundColor: "#93540A",
