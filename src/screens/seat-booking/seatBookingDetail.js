@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   SafeAreaView,
+  TextInput,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
@@ -37,6 +38,7 @@ export default SeatBookingDetail = function ({ route, navigation }) {
   const [endTime, setEndTime] = useState(null);
   const [isSelectingStart, setIsSelectingStart] = useState(true);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [customerEmail, setCustomerEmail] = useState("");
 
   const formattedDate = currentDate.toLocaleDateString("en-CA"); //TODO Chuyển đổi ngày thành format "YYYY-MM-DD"
 
@@ -324,6 +326,7 @@ export default SeatBookingDetail = function ({ route, navigation }) {
       bookingDate: formattedDate, // YYYY-MM-DD
       startTime: startTimeFormatted, // Gửi startTime dưới dạng "HH:mm"
       duration: durationInMinutes,
+      email: customerEmail || null,
     };
 
     console.log("Gửi yêu cầu đặt chỗ với:", bookingData, accessToken);
@@ -463,6 +466,14 @@ export default SeatBookingDetail = function ({ route, navigation }) {
                 <Text style={styles.timePickerText}>Chọn giờ kết thúc</Text>
               </TouchableOpacity>
             </View>
+            <TextInput
+              style={styles.emailInput}
+              placeholder="Nhập email khách hàng (tùy chọn)"
+              value={customerEmail}
+              onChangeText={setCustomerEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
             <GeneralButton
               text="Kiểm tra & Đặt chỗ"
               onPress={checkAvailability}
@@ -685,5 +696,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 16,
+  },
+  emailInput: {
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 2,
   },
 });

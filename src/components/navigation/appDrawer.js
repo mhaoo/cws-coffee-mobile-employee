@@ -23,12 +23,9 @@ export default function AppDrawer() {
     >
       <Drawer.Screen name="Đơn hàng" component={Order} />
       <Drawer.Screen name="Menu" component={Menu} />
-      <Drawer.Screen name="Đặt chỗ" component={SeatBooking} />
+      <Drawer.Screen name="Đặt phòng" component={SeatBooking} />
       <Drawer.Screen name="Thiết bị" component={Device} />
-      <Drawer.Screen
-        name="Quản lý chỗ ngồi"
-        component={SeatsManagementScreen}
-      />
+      <Drawer.Screen name="Quản lý phòng" component={SeatsManagementScreen} />
     </Drawer.Navigator>
   );
 }

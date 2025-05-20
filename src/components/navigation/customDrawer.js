@@ -21,12 +21,12 @@ const items = [
   },
   { name: "Menu", iconLib: Ionicons, iconName: "cafe-outline" },
   {
-    name: "Đặt chỗ",
+    name: "Đặt phòng",
     iconLib: MaterialCommunityIcons,
     iconName: "seat-outline",
   },
   { name: "Thiết bị", iconLib: Ionicons, iconName: "print-outline" },
-  { name: "Quản lý chỗ ngồi", iconLib: Ionicons, iconName: "print-outline" },
+  { name: "Quản lý phòng", iconLib: Ionicons, iconName: "leaf-outline" },
 ];
 
 export default function CustomDrawer(props) {

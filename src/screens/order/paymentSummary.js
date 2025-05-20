@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { toCurrency } from "../../utils/currency";
 import usePayBooking from "../../hooks/payment/usePayBooking";
+import useCustomerInformation from "../../hooks/profile/useCustomerInformation";
 
 export default function PaymentSummaryScreen({ route, navigation }) {
   const { booking, total, onSuccess } = route.params;
@@ -22,6 +23,14 @@ export default function PaymentSummaryScreen({ route, navigation }) {
   const [cash, setCash] = useState(total);
   const [usedMemberPoint, setUsedMemberPoint] = useState(0);
   const { mutate: payBooking, isLoading: isPaying } = usePayBooking();
+  // State and hook for customer information lookup
+  const [searchEmail, setSearchEmail] = useState("");
+  const [emailToSearch, setEmailToSearch] = useState("");
+  const {
+    data: customerInfo,
+    isLoading: isCustomerLoading,
+    error: customerError,
+  } = useCustomerInformation(emailToSearch);
 
   // Tổng hợp các mục cần thanh toán: phòng + orders + devices
   const items = [
@@ -58,7 +67,7 @@ export default function PaymentSummaryScreen({ route, navigation }) {
       {
         onSuccess: () => {
           onSuccess();
-          navigation.goBack();
+          navigation.pop(3);
         },
         onError: (error) => {
           Alert.alert("Lỗi thanh toán", error.message);
@@ -104,34 +113,66 @@ export default function PaymentSummaryScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Cash payment form */}
+      {/* Cash payment form with customer info search */}
       {showCashForm && (
-        <View style={styles.cashForm}>
-          <Text style={styles.inputLabel}>Tiền khách đưa (VNĐ):</Text>
-          <TextInput
-            value={String(cash)}
-            onChangeText={(t) => setCash(Number(t))}
-            keyboardType="numeric"
-            style={styles.textInput}
-          />
-          <Text style={styles.inputLabel}>Điểm sử dụng:</Text>
-          <TextInput
-            value={String(usedMemberPoint)}
-            onChangeText={(t) => setUsedMemberPoint(Number(t))}
-            keyboardType="numeric"
-            style={styles.textInput}
-          />
-          <TouchableOpacity
-            style={styles.payBtn}
-            onPress={handleCashPayment}
-            disabled={isPaying}
-          >
-            {isPaying ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.payTxt}>Xác nhận thanh toán</Text>
+        <View style={styles.cashContainer}>
+          <View style={styles.cashForm}>
+            <Text style={styles.inputLabel}>Tiền khách đưa (VNĐ):</Text>
+            <TextInput
+              value={String(cash)}
+              onChangeText={(t) => setCash(Number(t))}
+              keyboardType="numeric"
+              style={styles.textInput}
+            />
+            <Text style={styles.inputLabel}>Điểm sử dụng:</Text>
+            <TextInput
+              value={String(usedMemberPoint)}
+              onChangeText={(t) => setUsedMemberPoint(Number(t))}
+              keyboardType="numeric"
+              style={styles.textInput}
+            />
+            <TouchableOpacity
+              style={styles.payBtn}
+              onPress={handleCashPayment}
+              disabled={isPaying}
+            >
+              {isPaying ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.payTxt}>Xác nhận thanh toán</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={styles.customerForm}>
+            <Text style={styles.inputLabel}>Email khách hàng:</Text>
+            <TextInput
+              value={searchEmail}
+              onChangeText={setSearchEmail}
+              style={styles.textInput}
+              placeholder="Nhập email khách hàng"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.searchBtn}
+              onPress={() => setEmailToSearch(searchEmail)}
+            >
+              <Text style={styles.payTxt}>Tìm kiếm</Text>
+            </TouchableOpacity>
+            {isCustomerLoading && <ActivityIndicator />}
+            {customerError && (
+              // <Text style={styles.errorText}>Lỗi tìm kiếm</Text>
+              <Text style={styles.errorText}>{customerError.message}</Text>
             )}
-          </TouchableOpacity>
+            {customerInfo && (
+              <View style={styles.customerInfo}>
+                <Text>
+                  {customerInfo.firstName} {customerInfo.lastName}
+                </Text>
+                <Text>Điểm thành viên: {customerInfo.memberPoint}</Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -155,7 +196,8 @@ const styles = StyleSheet.create({
   buttonRow: { flexDirection: "row", marginBottom: 12 },
   payBtn: { backgroundColor: "#93540A", padding: 14, borderRadius: 6 },
   payTxt: { color: "#fff", textAlign: "center", fontWeight: "700" },
-  cashForm: { marginTop: 12 },
+  cashContainer: { flexDirection: "row", marginTop: 12 },
+  cashForm: { flex: 1, marginRight: 12 },
   inputLabel: { fontSize: 14, marginBottom: 4 },
   textInput: {
     borderWidth: 1,
@@ -164,4 +206,14 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 12,
   },
+  customerForm: { flex: 1 },
+  searchBtn: {
+    backgroundColor: "#93540A",
+    padding: 14,
+    borderRadius: 6,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  errorText: { color: "red", marginTop: 8 },
+  customerInfo: { padding: 12 },
 });

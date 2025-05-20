@@ -9,7 +9,8 @@ const authApi = {
 
   getProfile: () => apiClient.get("/api/employee"),
 
-  getCustomerInformation: () => apiClient.get(`/api/customer`),
+  getCustomerInformation: (email) =>
+    apiClient.get("/api/employee/bookings/info-user", { params: { email } }),
 
   getBranchesDetailById: (branchId) =>
     apiClient.get(`/api/employee/branches/${branchId}`),
@@ -113,6 +114,13 @@ const authApi = {
   addItemToOrder: (bookingId, item) =>
     apiClient.post(`/api/employee/orders/add-item`, { bookingId, item }),
 
+  //* API xóa các sản phẩm khỏi đơn Order
+  deleteItemToOrder: (itemId) =>
+    apiClient.delete(`/api/employee/orders/delete-item/${itemId}`),
+
+  //* API cập nhật trạng thái đơn order thành completed
+  completedOrder: (id) => apiClient.put(`/api/employee/orders/completed/${id}`),
+
   //! PAYMENT
   //* API gửi yêu cầu thanh toán của đơn booking
   // body should include { paymentMethod: 'CASH'|'CARD', usedMemberPoint: number, cash: number }
@@ -125,6 +133,11 @@ const authApi = {
       amount,
       bookingId,
     }),
+
+  //! SEAT MANAGEMENT
+  //* API lấy danh sách các phòng với trạng thái chi tiết
+  getRoomsWithStatus: (branchId) =>
+    apiClient.get(`/api/employee/rooms/rooms-with-status/${branchId}`),
 };
 
 export default authApi;
