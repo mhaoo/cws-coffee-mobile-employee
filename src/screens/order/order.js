@@ -15,7 +15,6 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import useCancelBooking from "../../hooks/booking/useCancelBooking";
 import useBookingsByDate from "../../hooks/booking/useBookingsByDate";
 import useBookingsByEmail from "../../hooks/booking/useBookingsByEmail";
-import useBookingsByCurrentDateAndEmail from "../../hooks/booking/useBookingsByCurrentDateAndEmail";
 
 export default function OrderScreen() {
   // State
@@ -48,33 +47,28 @@ export default function OrderScreen() {
   }, [date]);
 
   // APIs via hooks
-  const { data: dateBookings = [], refetch: refetchDateBookings } = useBookingsByDate(dateParam);
-  const { data: emailBookings = [], refetch: refetchEmailBookings } = useBookingsByEmail(searchEmail);
-  const { data: currentEmailBookings = [], refetch: refetchCurrentBookings } = useBookingsByCurrentDateAndEmail(searchEmail);
+  const { data: dateBookings = [], refetch: refetchDateBookings } =
+    useBookingsByDate(dateParam);
+  const { data: emailBookings = [], refetch: refetchEmailBookings } =
+    useBookingsByEmail(searchEmail);
 
   // Refetch bookings when screen is focused (e.g., after payment)
   useFocusEffect(
     useCallback(() => {
-      if (searchMode === 'date') {
-        refetchDateBookings();
-      } else if (searchMode === 'email') {
+      if (searchMode === "email") {
         refetchEmailBookings();
-      } else if (searchMode === 'current') {
-        refetchCurrentBookings();
+      } else {
+        refetchDateBookings();
       }
-    }, [searchMode, refetchDateBookings, refetchEmailBookings, refetchCurrentBookings])
+    }, [searchMode, refetchDateBookings, refetchEmailBookings])
   );
 
   const handleSearchByEmail = () => setSearchMode("email");
 
-  const handleSearchCurrent = () => setSearchMode("current");
-
   // Choose bookings based on mode
   const bookingsToShow = useMemo(() => {
-    if (searchMode === "email") return emailBookings;
-    if (searchMode === "current") return currentEmailBookings;
-    return dateBookings;
-  }, [searchMode, dateBookings, emailBookings, currentEmailBookings]);
+    return searchMode === "email" ? emailBookings : dateBookings;
+  }, [searchMode, dateBookings, emailBookings]);
 
   // Filter by tab status:
   // PENDING, PAID straightforward;
@@ -141,20 +135,20 @@ export default function OrderScreen() {
       )}
 
       {/* Email search */}
-      <TextInput
-        style={styles.emailInput}
-        placeholder="Nhập email khách hàng"
-        value={searchEmail}
-        onChangeText={setSearchEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <View style={styles.searchRow}>
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearchByEmail}>
-          <Text>Tìm kiếm</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearchCurrent}>
-          <Text>Tìm kiếm trong ngày</Text>
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Nhập email khách hàng"
+          value={searchEmail}
+          onChangeText={setSearchEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={handleSearchByEmail}
+        >
+          <Text style={styles.searchButtonText}>Tìm kiếm</Text>
         </TouchableOpacity>
       </View>
 
@@ -192,19 +186,19 @@ export default function OrderScreen() {
             });
             extraActions.push({
               title: "Hủy đơn",
-              onPress: () => cancelBooking(item.id, {
-                onSuccess: (response) => {
-                  const msg = response.data?.message || 'Hủy đơn thành công';
-                  Alert.alert('Thông báo', msg);
-                  updateBooking({ ...item, status: 'CANCELED' });
-                  if (searchMode === 'date') refetchDateBookings();
-                  else if (searchMode === 'email') refetchEmailBookings();
-                  else if (searchMode === 'current') refetchCurrentBookings();
-                },
-                onError: (error) => {
-                  Alert.alert('Lỗi', error.message);
-                }
-              }),
+              onPress: () =>
+                cancelBooking(item.id, {
+                  onSuccess: (response) => {
+                    const msg = response.data?.message || "Hủy đơn thành công";
+                    Alert.alert("Thông báo", msg);
+                    updateBooking({ ...item, status: "CANCELED" });
+                    if (searchMode === "email") refetchEmailBookings();
+                    else refetchDateBookings();
+                  },
+                  onError: (error) => {
+                    Alert.alert("Lỗi", error.message);
+                  },
+                }),
               style: { backgroundColor: "#d9534f" },
               textStyle: { color: "#fff" },
             });
@@ -220,61 +214,67 @@ export default function OrderScreen() {
                 onPress: () =>
                   navigation.navigate("Device", { bookingId: item.id }),
               },
-              {
-                title: `Thu tiền Order (${(item.orders || []).filter((o) => o.status === "PENDING").length})`,
-                onPress: () =>
-                  updateBooking({
-                    ...item,
-                    status: "DOING",
-                    orders: (item.orders || []).map((o) => ({ ...o, status: "PAID" })),
-                  }),
-              },
+              // {
+              //   title: `Thu tiền Order (${(item.orders || []).filter((o) => o.status === "PENDING").length})`,
+              //   onPress: () =>
+              //     updateBooking({
+              //       ...item,
+              //       status: "DOING",
+              //       orders: (item.orders || []).map((o) => ({ ...o, status: "PAID" })),
+              //     }),
+              // },
               {
                 title: "Hủy đơn",
-                onPress: () => cancelBooking(item.id, {
-                  onSuccess: (response) => {
-                    const msg = response.data?.message || 'Hủy đơn thành công';
-                    Alert.alert('Thông báo', msg);
-                    updateBooking({ ...item, status: 'CANCELED' });
-                    if (searchMode === 'date') refetchDateBookings();
-                    else if (searchMode === 'email') refetchEmailBookings();
-                    else if (searchMode === 'current') refetchCurrentBookings();
-                  },
-                  onError: (error) => {
-                    Alert.alert('Lỗi', error.message);
-                  }
-                }),
+                onPress: () =>
+                  cancelBooking(item.id, {
+                    onSuccess: (response) => {
+                      const msg =
+                        response.data?.message || "Hủy đơn thành công";
+                      Alert.alert("Thông báo", msg);
+                      updateBooking({ ...item, status: "CANCELED" });
+                      if (searchMode === "email") refetchEmailBookings();
+                      else refetchDateBookings();
+                    },
+                    onError: (error) => {
+                      Alert.alert("Lỗi", error.message);
+                    },
+                  }),
                 style: { backgroundColor: "#d9534f" },
                 textStyle: { color: "#fff" },
               }
             );
-          } else if (item.status === "DOING") {
-            extraActions.push({
-              title: `Xác nhận Order (${(item.orders || []).filter((o) => o.status === "PAID").length})`,
-              onPress: () =>
-                updateBooking({
-                  ...item,
-                  status: "CONFIRMED",
-                  orders: (item.orders || []).map((o) => ({
-                    ...o,
-                    status: "CONFIRMED",
-                  })),
-                }),
-            });
-          } else if (item.status === "CONFIRMED") {
-            extraActions.push({
-              title: `Xác nhận Order (${(item.orders || []).filter((o) => o.status === "PAID").length})`,
-              onPress: () =>
-                updateBooking({
-                  ...item,
-                  status: "CONFIRMED",
-                  orders: (item.orders || []).map((o) => ({
-                    ...o,
-                    status: "CONFIRMED",
-                  })),
-                }),
-            });
           }
+          // else if (item.status === "DOING") {
+          //   extraActions.push({
+          //     title: `Xác nhận Order (${
+          //       (item.orders || []).filter((o) => o.status === "PAID").length
+          //     })`,
+          //     onPress: () =>
+          //       updateBooking({
+          //         ...item,
+          //         status: "CONFIRMED",
+          //         orders: (item.orders || []).map((o) => ({
+          //           ...o,
+          //           status: "CONFIRMED",
+          //         })),
+          //       }),
+          //   });
+          // } else if (item.status === "CONFIRMED") {
+          //   extraActions.push({
+          //     title: `Xác nhận Order (${
+          //       (item.orders || []).filter((o) => o.status === "PAID").length
+          //     })`,
+          //     onPress: () =>
+          //       updateBooking({
+          //         ...item,
+          //         status: "CONFIRMED",
+          //         orders: (item.orders || []).map((o) => ({
+          //           ...o,
+          //           status: "CONFIRMED",
+          //         })),
+          //       }),
+          //   });
+          // }
           return (
             <BookingCard
               order={item}
@@ -319,23 +319,30 @@ const styles = StyleSheet.create({
   tabTxt: { fontSize: 14, color: "#666" },
   tabTxtA: { color: "#93540A", fontWeight: "700" },
   emptyTxt: { textAlign: "center", marginTop: 40, color: "#999" },
-  emailInput: {
-    padding: 12,
+  searchContainer: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginVertical: 8,
+    alignItems: "center",
+  },
+  searchInput: {
+    flex: 1,
     backgroundColor: "#fff",
-    margin: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
     elevation: 2,
   },
-  searchRow: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-  },
-  searchBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#93540A",
+  searchButton: {
+    marginLeft: 8,
+    backgroundColor: "#93540A",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 8,
+    elevation: 2,
+  },
+  searchButtonText: {
+    color: "#fff",
+    fontWeight: "600",
   },
 });

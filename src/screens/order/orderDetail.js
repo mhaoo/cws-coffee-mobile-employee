@@ -15,7 +15,9 @@ import {
 import GeneralButton from "../../components/button/generalButton";
 import { toCurrency } from "../../utils/currency";
 import useOrdersByBookingId from "../../hooks/order/useOrdersByBookingId";
-import useOrderDetailsById, { fetchOrderDetailsById } from "../../hooks/order/useOrderDetailsById";
+import useOrderDetailsById, {
+  fetchOrderDetailsById,
+} from "../../hooks/order/useOrderDetailsById";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import useDeleteItemToOrder from "../../hooks/order/useDeleteItemToOrder";
@@ -77,9 +79,15 @@ export default function OrderDetailScreen({ route, navigation }) {
   // Determine if booking is in 'Đang thực hiện' (confirmed and not expired)
   const now = new Date();
   const bookingEndDate = new Date(`${booking.bookingDate}T${booking.endTime}`);
-  const isOngoingBooking = booking.status === "CONFIRMED" && bookingEndDate >= now;
+  const isOngoingBooking =
+    booking.status === "CONFIRMED" && bookingEndDate >= now;
+  // Determine if this booking belongs to the History tab (canceled, expired, or past confirmed)
+  const isHistoryBooking = !isOngoingBooking && booking.status !== "PENDING" && booking.status !== "PAID";
   // Prepare flattened item list for non-ongoing bookings
-  const flattenedItems = detailsQueries.reduce((all, q) => all.concat(q.data?.items || []), []);
+  const flattenedItems = detailsQueries.reduce(
+    (all, q) => all.concat(q.data?.items || []),
+    []
+  );
 
   // Refetch orders when screen is focused (e.g., after adding item)
   useFocusEffect(
@@ -100,21 +108,19 @@ export default function OrderDetailScreen({ route, navigation }) {
   // Total sum for display
   const totalSum =
     booking.room.price +
-    detailsQueries.reduce(
-      (all, q) => all.concat(q.data?.items || []),
-      []
-    ).reduce((sum, x) => sum + x.price * x.quantity, 0);
+    detailsQueries
+      .reduce((all, q) => all.concat(q.data?.items || []), [])
+      .reduce((sum, x) => sum + x.price * x.quantity, 0);
 
   // Navigate to PaymentSummary instead of direct payment
   const handlePayBooking = () => {
     // Prepare updated booking for payment: use fetched items as order line items
-    const lineItems = detailsQueries.reduce(
-      (all, q) => all.concat(q.data?.items || []),
-      []
-    ).map((i) => ({
-      ...i,
-      qty: i.quantity,
-    }));
+    const lineItems = detailsQueries
+      .reduce((all, q) => all.concat(q.data?.items || []), [])
+      .map((i) => ({
+        ...i,
+        qty: i.quantity,
+      }));
     const updatedBooking = {
       ...booking,
       orders: lineItems,
@@ -168,45 +174,55 @@ export default function OrderDetailScreen({ route, navigation }) {
       <View style={styles.orderContainer}>
         <View style={styles.orderSummary}>
           <Text style={styles.orderSummaryText}>Đơn #{order.id}</Text>
+          {(order.status === "PENDING" || order.status === "CONFIRMED") ? (
+            <TouchableOpacity
+              style={[styles.completeBtn, order.status === "PENDING" && { borderColor: "#f0ad4e" }]}
+              onPress={() =>
+                completeOrder(order.id, {
+                  onSuccess: () => {
+                    Alert.alert("Thông báo", order.status === "PENDING" ? "Thanh toán thành công" : "Hoàn tất đơn thành công");
+                    refetchOrders();
+                  },
+                  onError: (error) => Alert.alert("Lỗi", error.message),
+                })
+              }
+              disabled={isCompleting}
+            >
+              <Text style={styles.completeBtnText}>
+                {isCompleting ? "..." : order.status === "PENDING" ? "Thanh toán" : "Hoàn tất"}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.doneLabel}>Đã hoàn tất</Text>
+          )}
           <TouchableOpacity
-            style={styles.completeBtn}
             onPress={() =>
-              completeOrder(order.id, {
-                onSuccess: () => {
-                  Alert.alert("Thông báo", "Hoàn tất đơn thành công");
-                  queryClient.invalidateQueries({ queryKey: ["orderDetailsByBooking"] });
-                  refetchOrders();
-                },
-                onError: (error) => Alert.alert("Lỗi", error.message),
-              })
-            }
-            disabled={isCompleting}
-          >
-            <Text style={styles.completeBtnText}>{isCompleting ? "..." : "Hoàn tất"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.cancelOrderBtn}
-            onPress={() => Alert.alert("Chức năng Hủy đơn đang phát triển")}
-          >
-            <Text style={styles.cancelOrderBtnText}>Hủy</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() =>
-              setExpandedOrders(prev =>
+              setExpandedOrders((prev) =>
                 prev.includes(order.id)
-                  ? prev.filter(id => id !== order.id)
+                  ? prev.filter((id) => id !== order.id)
                   : [...prev, order.id]
               )
             }
           >
-            <Text style={styles.expandBtnText}>{isExpanded ? "Thu gọn" : "Chi tiết"}</Text>
+            <Text style={styles.expandBtnText}>
+              {isExpanded ? "Thu gọn" : "Chi tiết"}
+            </Text>
           </TouchableOpacity>
         </View>
         {isExpanded && (
           <View style={styles.orderItemsContainer}>
-            {details?.items?.map(item => (
-              <View key={item.id} style={[styles.orderItem, order.status === "CONFIRMED" && styles.confirmedItem] }>
-                <Image source={{ uri: item.images?.[0] }} style={styles.itemImg} />
+            {details?.items?.map((item) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.orderItem,
+                  order.status === "CONFIRMED" && styles.confirmedItem,
+                ]}
+              >
+                <Image
+                  source={{ uri: item.images?.[0] }}
+                  style={styles.itemImg}
+                />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>{item.name}</Text>
                   <Text style={styles.itemSize}>Size: {item.size}</Text>
@@ -222,7 +238,9 @@ export default function OrderDetailScreen({ route, navigation }) {
                     <Text style={styles.itemNote}>Ghi chú: {item.note}</Text>
                   ) : null}
                 </View>
-                <Text style={styles.itemTotal}>{toCurrency(item.price * item.quantity)} VNĐ</Text>
+                <Text style={styles.itemTotal}>
+                  {toCurrency(item.price * item.quantity)} VNĐ
+                </Text>
               </View>
             ))}
           </View>
@@ -248,10 +266,14 @@ export default function OrderDetailScreen({ route, navigation }) {
               Options: {item.options.map((opt) => opt.name).join(", ")}
             </Text>
           )}
-          {item.note && <Text style={styles.itemNote}>Ghi chú: {item.note}</Text>}
+          {item.note && (
+            <Text style={styles.itemNote}>Ghi chú: {item.note}</Text>
+          )}
         </View>
-        <Text style={styles.itemTotal}>{toCurrency(item.price * item.quantity)} VNĐ</Text>
-        {booking.status === "CONFIRMED" && !isConfirmed && (
+        <Text style={styles.itemTotal}>
+          {toCurrency(item.price * item.quantity)} VNĐ
+        </Text>
+        {!isHistoryBooking && booking.status === "CONFIRMED" && !isConfirmed && (
           <TouchableOpacity
             onPress={() => handleConfirmItem(item)}
             style={styles.confirmBtnWrapper}
@@ -260,23 +282,26 @@ export default function OrderDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
         {isConfirmed && <Text style={styles.doneLabel}>Đã hoàn tất</Text>}
-        {/* Delete button for order item */}
-        <TouchableOpacity
-          onPress={() =>
-            deleteItem(item.id, {
-              onSuccess: () => {
-                Alert.alert("Thông báo", "Xóa sản phẩm thành công");
-                queryClient.invalidateQueries({ queryKey: ["orderDetailsByBooking"] });
-                refetchOrders();
-              },
-              onError: (error) => Alert.alert("Lỗi", error.message),
-            })
-          }
-          style={styles.deleteBtnWrapper}
-          disabled={isDeleting}
-        >
-          <Text style={styles.deleteBtn}>{isDeleting ? '...' : 'Xóa'}</Text>
-        </TouchableOpacity>
+        {!isHistoryBooking && (
+          <TouchableOpacity
+            onPress={() =>
+              deleteItem(item.id, {
+                onSuccess: () => {
+                  Alert.alert("Thông báo", "Xóa sản phẩm thành công");
+                  queryClient.invalidateQueries({
+                    queryKey: ["orderDetailsByBooking"],
+                  });
+                  refetchOrders();
+                },
+                onError: (error) => Alert.alert("Lỗi", error.message),
+              })
+            }
+            style={styles.deleteBtnWrapper}
+            disabled={isDeleting}
+          >
+            <Text style={styles.deleteBtn}>{isDeleting ? "..." : "Xóa"}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -314,39 +339,43 @@ export default function OrderDetailScreen({ route, navigation }) {
       </View>
 
       {/* Action buttons: Thêm SP, Thêm Thiết bị */}
-      <View style={styles.detailActions}>
-        <GeneralButton
-          text="Thêm SP"
-          onPress={() =>
-            navigation.navigate("MainApp", {
-              screen: "Menu",
-              params: { booking, updateBooking },
-            })
-          }
-          style={styles.detailBtn}
-        />
-        <GeneralButton
-          text="Thêm Thiết bị"
-          onPress={() =>
-            navigation.navigate("MainApp", {
-              screen: "Thiết bị",
-              params: { booking, updateBooking },
-            })
-          }
-          style={styles.detailBtn}
-        />
-      </View>
+      {!isHistoryBooking && (
+        <View style={styles.detailActions}>
+          <GeneralButton
+            text="Thêm sản phẩm"
+            onPress={() =>
+              navigation.navigate("MainApp", {
+                screen: "Menu",
+                params: { booking, updateBooking },
+              })
+            }
+            style={styles.detailBtn}
+          />
+          <GeneralButton
+            text="Thêm thiết bị"
+            onPress={() =>
+              navigation.navigate("MainApp", {
+                screen: "Thiết bị",
+                params: { booking, updateBooking },
+              })
+            }
+            style={styles.detailBtn}
+          />
+        </View>
+      )}
 
       {/* Orders or items list depending on booking status */}
       {isOngoingBooking ? (
-        <> 
+        <>
           <Text style={styles.sectionTitle}>Danh sách đơn Order</Text>
           <FlatList
             data={orders}
-            keyExtractor={o => o.id.toString()}
+            keyExtractor={(o) => o.id.toString()}
             renderItem={renderOrder}
             contentContainerStyle={styles.listContainer}
-            ListEmptyComponent={<Text style={styles.emptyTxt}>Chưa có đơn nào</Text>}
+            ListEmptyComponent={
+              <Text style={styles.emptyTxt}>Chưa có đơn nào</Text>
+            }
             showsVerticalScrollIndicator={false}
           />
         </>
@@ -355,10 +384,12 @@ export default function OrderDetailScreen({ route, navigation }) {
           <Text style={styles.sectionTitle}>Đơn hàng kèm theo</Text>
           <FlatList
             data={flattenedItems}
-            keyExtractor={item => item.id.toString()}
+            keyExtractor={(item) => item.id.toString()}
             renderItem={renderFlattenItem}
             contentContainerStyle={styles.listContainer}
-            ListEmptyComponent={<Text style={styles.emptyTxt}>Chưa có sản phẩm</Text>}
+            ListEmptyComponent={
+              <Text style={styles.emptyTxt}>Chưa có sản phẩm</Text>
+            }
             showsVerticalScrollIndicator={false}
           />
         </>
@@ -401,12 +432,33 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 
-  orderContainer: { marginVertical: 8, backgroundColor: "#fff", borderRadius: 8, padding: 8, elevation: 1 },
-  orderSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  orderContainer: {
+    marginVertical: 8,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 8,
+    elevation: 1,
+  },
+  orderSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   orderSummaryText: { fontSize: 16, fontWeight: "600" },
-  completeBtn: { padding: 6, borderWidth: 1, borderColor: "#4CAF50", borderRadius: 6 },
+  completeBtn: {
+    padding: 6,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    borderRadius: 6,
+  },
   completeBtnText: { color: "#4CAF50", fontWeight: "600" },
-  cancelOrderBtn: { padding: 6, borderWidth: 1, borderColor: "#d9534f", borderRadius: 6, marginLeft: 8 },
+  cancelOrderBtn: {
+    padding: 6,
+    borderWidth: 1,
+    borderColor: "#d9534f",
+    borderRadius: 6,
+    marginLeft: 8,
+  },
   cancelOrderBtnText: { color: "#d9534f", fontWeight: "600" },
   expandBtnText: { color: "#93540A", fontWeight: "600", marginLeft: 8 },
   orderItemsContainer: { marginTop: 8 },

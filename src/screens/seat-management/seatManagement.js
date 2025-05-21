@@ -8,7 +8,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../../contexts/authContext";
 import useRoomsWithStatus from "../../hooks/room/useRoomsWithStatus";
 import { toCurrency } from "../../utils/currency";
@@ -16,11 +16,29 @@ import { toCurrency } from "../../utils/currency";
 export default function SeatsManagementScreen() {
   const navigation = useNavigation();
   const { branchId } = useAuth();
-  const { data: rooms = [], isLoading, error } = useRoomsWithStatus(branchId);
+  const {
+    data: rooms = [],
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useRoomsWithStatus(branchId);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const renderRoom = ({ item }) => {
     const bgColor = item.status === "EMPTY" ? "#E8F5E9" : "#FFEBEE";
     const borderColor = item.status === "EMPTY" ? "#66BB6A" : "#EF5350";
+    const statusLabel =
+      item.status === "EMPTY"
+        ? "Đang trống"
+        : item.status === "USING"
+        ? "Đang được sử dụng"
+        : item.status;
     return (
       <TouchableOpacity
         style={[styles.roomItem, { backgroundColor: bgColor, borderColor }]}
@@ -34,7 +52,7 @@ export default function SeatsManagementScreen() {
         <Text>Vị trí: {item.location}</Text>
         <Text>Hoạt động: {item.active ? "Có" : "Không"}</Text>
         <Text style={[styles.roomStatus, { color: borderColor }]}>
-          Trạng thái: {item.status}
+          Trạng thái: {statusLabel}
         </Text>
         <Text>Giá: {toCurrency(item.price)} VNĐ/giờ</Text>
       </TouchableOpacity>
@@ -68,6 +86,8 @@ export default function SeatsManagementScreen() {
         numColumns={2}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        refreshing={isFetching}
+        onRefresh={refetch}
       />
     </View>
   );

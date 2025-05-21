@@ -17,7 +17,6 @@ const items = [
     name: "Đơn hàng",
     iconLib: Ionicons,
     iconName: "receipt-outline",
-    badge: 2,
   },
   { name: "Menu", iconLib: Ionicons, iconName: "cafe-outline" },
   {

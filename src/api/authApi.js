@@ -91,14 +91,15 @@ const authApi = {
 
   //* API lấy các đơn Booking theo email của khách hàng
   getBookingsByEmail: (email) =>
-    apiClient.get(`/api/employee/bookings/bookings-by-email`, email),
+    apiClient.get(`/api/employee/bookings/bookings-by-email`, {
+      params: { email },
+    }),
 
   //* API lấy các đơn Booking theo ngày hiện tại và Email của khách hàng
   getBookingsByCurrentDateAndEmail: (email) =>
-    apiClient.get(
-      `/api/employee/bookings/bookings-by-current-date-and-email`,
-      email
-    ),
+    apiClient.get(`/api/employee/bookings/bookings-by-current-date-and-email`, {
+      params: { email },
+    }),
 
   //* API lấy danh sách các đơn Order của đơn Booking theo BookingId
   getOrdersByBookingId: (bookingId) =>
@@ -138,6 +139,10 @@ const authApi = {
   //* API lấy danh sách các phòng với trạng thái chi tiết
   getRoomsWithStatus: (branchId) =>
     apiClient.get(`/api/employee/rooms/rooms-with-status/${branchId}`),
+
+  //* API lấy danh sách các đơn order theo phòng
+  getOrdersByRoomId: (roomId) =>
+    apiClient.get(`/api/employee/orders/by-room/${roomId}`),
 };
 
 export default authApi;

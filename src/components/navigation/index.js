@@ -8,6 +8,7 @@ import QrPaymentScreen from "../../screens/order/qrPayment";
 import seatBookingDetail from "../../screens/seat-booking/seatBookingDetail";
 import ProductDetail from "../../screens/menu/productDetail";
 import SeatDetailScreen from "../../screens/seat-management/seatManagementDetail";
+import DeviceDetail from "../../screens/device/deviceDetail";
 // import BottomTabNavigator from "./tabNavigator";
 
 const Stack = createStackNavigator();
@@ -53,6 +54,11 @@ const StackNavigator = () => {
       <Stack.Screen
         name="SeatDetail"
         component={SeatDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="DeviceDetail"
+        component={DeviceDetail}
         options={{ headerShown: false }}
       />
       <Stack.Screen name="MainApp" component={AppDrawer} />
